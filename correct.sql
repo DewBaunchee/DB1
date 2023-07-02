@@ -200,40 +200,52 @@ CLUSTER office USING PK_office;
 
 CREATE TABLE transaction_operational
 (
-    po_id         BIGSERIAL,
-    po_from       CHAR(34) NOT NULL,
-    po_to         CHAR(34) NOT NULL,
-    po_amount     MONEY    NOT NULL,
-    po_currency   CHAR(3)  NOT NULL,
-    po_office     INT      NOT NULL,
-    po_commission FLOAT    NOT NULL,
-    po_date       TIMESTAMP,
-    CONSTRAINT PK_transaction_operational PRIMARY KEY (po_id),
+    to_id         BIGSERIAL,
+    to_from       CHAR(34) NOT NULL,
+    to_to         CHAR(34) NOT NULL,
+    to_amount     MONEY    NOT NULL,
+    to_currency   CHAR(3)  NOT NULL,
+    to_office     INT      NOT NULL,
+    to_commission FLOAT    NOT NULL,
+    to_date       TIMESTAMP,
+    CONSTRAINT PK_transaction_operational PRIMARY KEY (to_id),
     CONSTRAINT FK_transaction_operational_currency
-        FOREIGN KEY (po_currency) REFERENCES currency (cur_code)
+        FOREIGN KEY (to_currency) REFERENCES currency (cur_code)
             ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT FK_transaction_operational_office
-        FOREIGN KEY (po_office) REFERENCES office (of_id)
+        FOREIGN KEY (to_office) REFERENCES office (of_id)
             ON DELETE RESTRICT ON UPDATE RESTRICT
 );
 CLUSTER transaction_operational USING PK_transaction_operational;
 
 CREATE TABLE transaction_archive
 (
-    pa_id         BIGINT,
-    pa_from       CHAR(34) NOT NULL,
-    pa_to         CHAR(34) NOT NULL,
-    pa_amount     MONEY    NOT NULL,
-    pa_currency   CHAR(3)  NOT NULL,
-    pa_office     INT      NOT NULL,
-    pa_commission FLOAT    NOT NULL,
-    pa_date       TIMESTAMP,
-    CONSTRAINT PK_transaction_archive PRIMARY KEY (pa_id),
+    ta_id         BIGINT,
+    ta_from       CHAR(34) NOT NULL,
+    ta_to         CHAR(34) NOT NULL,
+    ta_amount     MONEY    NOT NULL,
+    ta_currency   CHAR(3)  NOT NULL,
+    ta_office     INT      NOT NULL,
+    ta_commission FLOAT    NOT NULL,
+    ta_date       TIMESTAMP,
+    CONSTRAINT PK_transaction_archive PRIMARY KEY (ta_id),
     CONSTRAINT FK_transaction_archive_currency
-        FOREIGN KEY (pa_currency) REFERENCES currency (cur_code)
+        FOREIGN KEY (ta_currency) REFERENCES currency (cur_code)
             ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT FK_transaction_archive_office
-        FOREIGN KEY (pa_office) REFERENCES office (of_id)
+        FOREIGN KEY (ta_office) REFERENCES office (of_id)
             ON DELETE RESTRICT ON UPDATE RESTRICT
 );
 CLUSTER transaction_archive USING PK_transaction_archive;
+
+CREATE OR REPLACE PROCEDURE archive_transactions(archive_after TIMESTAMP)
+LANGUAGE SQL
+AS $$
+    WITH moved_rows as (
+        DELETE FROM transaction_operational as r
+        WHERE to_date < archive_after
+        RETURNING r.to_id, r.to_from, r.to_to, r.to_amount, r.to_currency, r.to_office, r.to_commission, r.to_date
+    )
+    INSERT INTO transaction_archive (ta_id, ta_from, ta_to, ta_amount, ta_currency, ta_office, ta_commission, ta_date)
+    SELECT * FROM moved_rows;
+$$;
